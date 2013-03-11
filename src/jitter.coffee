@@ -135,9 +135,15 @@ compileScript= (source, target, options) ->
     code= fs.readFileSync(source).toString()
     try
       currentJS = fs.readFileSync(targetPath).toString()
-    js= CoffeeScript.compile code, {source, bare: options?.bare}
-    return if js is currentJS
-    writeJS js, targetPath
+    js= CoffeeScript.compile code, {source, filename: source, bare: options?.bare, sourceMap: options?.map}
+    unless options?.map
+      return if js is currentJS
+      writeJS js, targetPath
+    else
+      return if js.js is currentJS
+      sourceMapPath = mapPath source, target
+      writeJS "#{js.js}\n/*\n//@ sourceMappingURL=#{path.basename sourceMapPath, 'map'}map\n*/\n", targetPath
+      writeJS js.v3SourceMap, sourceMapPath
     if currentJS?
       puts 'Recompiled '+ source
     else
@@ -147,8 +153,14 @@ compileScript= (source, target, options) ->
     notify source, err.message
 
 jsPath= (source, target) ->
+  makePath source, target, 'js'
+
+mapPath= (source, target) ->
+  makePath source, target, 'map'
+
+makePath= (source, target, extension) ->
   base= if target is baseTest then baseTest else baseSource
-  filename= path.basename(source, path.extname(source)) + '.js'
+  filename= path.basename(source, path.extname(source)) + '.' + extension
   dir=      target + path.dirname(source).substring(base.length)
   path.join dir, filename
 
@@ -182,6 +194,7 @@ runTests= ->
 parseOptions= ->
   optionParser= new optparse.OptionParser [
       ['-b', '--bare', 'compile without the top-level function wrapper']
+      ['-m', '--map', 'generate source map and save as .map files']
   ], BANNER
   options=    optionParser.parse process.argv
   [baseSource, baseTarget, baseTest]= (options.arguments[arg] or '' for arg in [2..4])
