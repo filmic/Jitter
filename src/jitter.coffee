@@ -268,7 +268,7 @@ compileScript = (source, target, options) ->
 
         puts msg
 
-        if not options?.beep
+        if not options?.silent
 
             `console.log("\007")`
 
