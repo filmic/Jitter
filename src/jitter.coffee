@@ -147,10 +147,51 @@ rootCompile = (options) ->
     compile(baseSource, baseTarget, options)
     compile(baseTest, baseTest, options) if baseTest
 
+updateLintIgnoreFiles= (options) ->
+  return unless options?
+
+  if options.jslintignore and options.jshintignore
+    lintignorePath = options.arguments[2]
+    hintignorePath = options.arguments[3]
+  else if options.jslintignore
+    lintignorePath = options.arguments[2]
+  else if options.jshintignore
+    hintignorePath = options.arguments[2]
+
+  if options.jslintignore
+    lintignoreContent = ''
+    lintignorePathAbs = path.resolve path.dirname lintignorePath
+    baseTargetAbs = path.resolve baseTarget
+    jsFolderPathRel = "#{path.relative lintignorePathAbs, baseTargetAbs}/js"
+    for own filePath of isWatched
+      filePathAbs = path.resolve filePath.replace '.coffee', '.js'
+      filePathRel = (path.relative lintignorePathAbs, filePathAbs).replace /\\/g, '\/'
+      filePathRel = filePathRel.replace jsFolderPathRel, '**'
+      lintignoreContent += "#{filePathRel}\n"  
+
+    fs.writeFileSync lintignorePath, lintignoreContent
+    puts "Updated #{lintignorePath} file"
+
+  if options.jshintignore
+    hintignoreContent = ''
+    hintignorePathAbs = path.resolve path.dirname hintignorePath
+
+    hintignoreStaticContent = fs.readFileSync(hintignorePath).toString().match /^###[\s\S]*###$/m
+    if hintignoreStaticContent then hintignoreStaticContent+='\n' else hintignoreStaticContent = ''
+
+    for own filePath of isWatched
+      filePathAbs = path.resolve filePath.replace '.coffee', '.js'
+      filePathRel = (path.relative hintignorePathAbs, filePathAbs).replace /\\/g, '\/'
+      hintignoreContent += "#{filePathRel}\n"
+
+    fs.writeFileSync hintignorePath, hintignoreStaticContent+hintignoreContent
+    puts "Updated #{hintignorePath} file"
+
 readScript = (source, target, options) ->
 
     compileScript(source, target, options)
     watchScript(source, target, options)
+    updateLintIgnoreFiles options
 
 watchScript = (source, target, options) ->
 
@@ -356,16 +397,22 @@ parseOptions = ->
             ['-b', '--bare', 'compile without the top-level function wrapper'],
             ['-m', '--map', 'compile with source maps'],
             ['-s', '--silent', 'don\'t make beep sounds on errors'],
+            ['-l', '--jslintignore', 'path to the .jslintignore file'],
+            ['-h', '--jshintignore', 'path to the .jshintignore file']
     ], BANNER
 
     options =    optionParser.parse process.argv
 
-    [baseSource, baseTarget, baseTest]= (options.arguments[arg] or '' for arg in [2..4])
+    if options.jslintignore and options.jshintignore
+      range = [4..6]
+    else if options.jslintignore or options.jshintignore
+      range = [3..5]
+    else
+      range = [2..4]
 
-    if /\/$/.test baseSource then baseSource = baseSource.substr 0, baseSource.length-1
-
-    if /\/$/.test baseTarget then baseTarget = baseTarget.substr 0, baseTarget.length-1
-
+    [baseSource, baseTarget, baseTest]= (options.arguments[arg] or '' for arg in range)
+    if /\/$/.test baseSource then baseSource= baseSource.substr 0, baseSource.length-1
+    if /\/$/.test baseTarget then baseTarget= baseTarget.substr 0, baseTarget.length-1
     options
 
 usage = ->
