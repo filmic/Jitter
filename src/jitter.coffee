@@ -258,6 +258,7 @@ compileScript = (source, target, options) ->
             generatedFile: jsFilename
             sourceRoot: pathToRoot
             sourceFiles: [coffeePath]
+            header: true
 
         }
 
